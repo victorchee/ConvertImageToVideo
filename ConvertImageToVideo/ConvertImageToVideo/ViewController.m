@@ -18,7 +18,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     // Do any additional setup after loading the view, typically from a nib.
-    [self convertImages:@[[UIImage imageNamed:@"frame"], [UIImage imageNamed:@"frame"]] duration:1 completionHandler:^(NSURL *location) {
+    [self convertImages:@[[UIImage imageNamed:@"frame1"], [UIImage imageNamed:@"frame2"]] duration:2 completionHandler:^(NSURL *location) {
         NSLog(@"%@", location);
     }];
 }
@@ -29,7 +29,15 @@
 }
 
 - (void)convertImages:(NSArray *)images duration:(NSTimeInterval)duration completionHandler:(void (^)(NSURL *location))completionHandler {
+    if (!images || images.count == 0 || duration <= 0) {
+        return;
+    }
+    
     NSLog(@"%f", CFAbsoluteTimeGetCurrent());
+    
+    if (images.count == 1) {
+        images = @[images.firstObject, images.firstObject];
+    }
     
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSURL *documentURL = [fileManager URLForDirectory:NSDocumentDirectory inDomain:NSUserDomainMask appropriateForURL:nil create:NO error:nil];
@@ -55,6 +63,10 @@
         if (writeInput.readyForMoreMediaData) {
             CMTime frameTime = CMTimeMake((duration/images.count)*600, 600);
             CMTime presentTime = CMTimeMake(index*frameTime.value, 600);
+            
+//            if (!index) {
+//                presentTime = frameTime;
+//            }
             
             if (index >= images.count) {
                 break;
