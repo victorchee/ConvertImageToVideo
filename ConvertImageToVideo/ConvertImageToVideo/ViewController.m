@@ -18,7 +18,9 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     // Do any additional setup after loading the view, typically from a nib.
-    [self convert];
+    [self convertImages:@[[UIImage imageNamed:@"frame"], [UIImage imageNamed:@"frame"]] duration:1 completionHandler:^(NSURL *location) {
+        NSLog(@"%@", location);
+    }];
 }
 
 - (void)didReceiveMemoryWarning {
@@ -26,36 +28,12 @@
     // Dispose of any resources that can be recreated.
 }
 
-- (CVPixelBufferRef)pixelBufferFromImage:(UIImage *)image {
-    NSDictionary *options = @{(__bridge NSString *)kCVPixelBufferCGImageCompatibilityKey: @YES, (__bridge NSString *)kCVPixelBufferCGBitmapContextCompatibilityKey: @YES};
-    CVPixelBufferRef pixelBuffer = NULL;
-    CVReturn status = CVPixelBufferCreate(kCFAllocatorDefault, image.size.width, image.size.height, kCVPixelFormatType_32ARGB, (__bridge CFDictionaryRef)options, &pixelBuffer);
-    NSParameterAssert(status == kCVReturnSuccess && pixelBuffer != NULL);
-    
-    CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-    void *pixelData = CVPixelBufferGetBaseAddress(pixelBuffer);
-    NSParameterAssert(pixelData != NULL);
-    
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-    CGContextRef context = CGBitmapContextCreate(pixelData, image.size.width, image.size.height, 8, 4*image.size.width, colorSpace, kCGImageAlphaNoneSkipFirst);
-    NSParameterAssert(context);
-    CGContextConcatCTM(context, CGAffineTransformMakeRotation(0));
-    CGContextDrawImage(context, CGRectMake(0, 0, image.size.width, image.size.height), image.CGImage);
-    CGColorSpaceRelease(colorSpace);
-    CGContextRelease(context);
-    
-    CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-    
-    return pixelBuffer;
-}
-
-- (void)convert {
+- (void)convertImages:(NSArray *)images duration:(NSTimeInterval)duration completionHandler:(void (^)(NSURL *location))completionHandler {
     NSLog(@"%f", CFAbsoluteTimeGetCurrent());
     
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSURL *documentURL = [fileManager URLForDirectory:NSDocumentDirectory inDomain:NSUserDomainMask appropriateForURL:nil create:NO error:nil];
     NSURL *destination = [documentURL URLByAppendingPathComponent:@"out.mp4"];
-    NSLog(@"%@", documentURL);
     [fileManager removeItemAtURL:destination error:nil];
     
     AVAssetWriter *videoWriter = [[AVAssetWriter alloc] initWithURL:destination fileType:AVFileTypeQuickTimeMovie error:nil];
@@ -71,8 +49,6 @@
     [videoWriter startWriting];
     [videoWriter startSessionAtSourceTime:kCMTimeZero];
     
-    NSArray *images = @[[UIImage imageNamed:@"frame"], [UIImage imageNamed:@"frame"]];
-    NSTimeInterval duration = 10;
     CVPixelBufferRef buffer = NULL;
     NSInteger index = 0;
     while (1) {
@@ -98,7 +74,36 @@
         CVPixelBufferPoolRelease(adaptor.pixelBufferPool);
         
         NSLog(@"%f", CFAbsoluteTimeGetCurrent());
+        
+        __block typeof(completionHandler) block = completionHandler;
+        if (block) {
+            block(destination);
+            block = nil;
+        }
     }];
+}
+
+- (CVPixelBufferRef)pixelBufferFromImage:(UIImage *)image {
+    NSDictionary *options = @{(__bridge NSString *)kCVPixelBufferCGImageCompatibilityKey: @YES, (__bridge NSString *)kCVPixelBufferCGBitmapContextCompatibilityKey: @YES};
+    CVPixelBufferRef pixelBuffer = NULL;
+    CVReturn status = CVPixelBufferCreate(kCFAllocatorDefault, image.size.width, image.size.height, kCVPixelFormatType_32ARGB, (__bridge CFDictionaryRef)options, &pixelBuffer);
+    NSParameterAssert(status == kCVReturnSuccess && pixelBuffer != NULL);
+    
+    CVPixelBufferLockBaseAddress(pixelBuffer, 0);
+    void *pixelData = CVPixelBufferGetBaseAddress(pixelBuffer);
+    NSParameterAssert(pixelData != NULL);
+    
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    CGContextRef context = CGBitmapContextCreate(pixelData, image.size.width, image.size.height, 8, 4*image.size.width, colorSpace, kCGImageAlphaNoneSkipFirst);
+    NSParameterAssert(context);
+    CGContextConcatCTM(context, CGAffineTransformMakeRotation(0));
+    CGContextDrawImage(context, CGRectMake(0, 0, image.size.width, image.size.height), image.CGImage);
+    CGColorSpaceRelease(colorSpace);
+    CGContextRelease(context);
+    
+    CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
+    
+    return pixelBuffer;
 }
 
 @end
